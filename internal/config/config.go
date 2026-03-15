@@ -3,25 +3,30 @@ package config
 import (
 	"os"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
 	KafkaBrokers   []string
 	KafkaTopic     string
+	KafkaGroup     string
 	MeiliSearchURL string
 	HttpPort       string
 }
 
 func Load() Config {
+	godotenv.Load()
 	return Config{
-		KafkaBrokers:   getBrokers(),
-		KafkaTopic:     getTopic(),
+		KafkaBrokers:   getKafkaBrokers(),
+		KafkaTopic:     getKafkaTopic(),
+		KafkaGroup:     getKafkaGroup(),
 		MeiliSearchURL: getMeiliSearchURL(),
 		HttpPort:       getHttpPort(),
 	}
 }
 
-func getBrokers() []string {
+func getKafkaBrokers() []string {
 	brokersEnv := os.Getenv("KAFKA_BROKERS")
 	addresses := strings.Split(brokersEnv, ",")
 	if len(addresses) == 1 && addresses[0] == "" {
@@ -30,7 +35,7 @@ func getBrokers() []string {
 	return addresses
 }
 
-func getTopic() string {
+func getKafkaTopic() string {
 	if env := os.Getenv("KAFKA_TOPIC"); env != "" {
 		return env
 	}
@@ -49,4 +54,11 @@ func getHttpPort() string {
 		return ":" + env
 	}
 	return ":8080"
+}
+
+func getKafkaGroup() string {
+	if env := os.Getenv("KAFKA_GROUP"); env != "" {
+		return env
+	}
+	return "default-group"
 }
