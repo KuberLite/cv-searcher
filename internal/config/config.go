@@ -44,9 +44,9 @@ func getKafkaTopic() string {
 
 func getMeiliSearchURL() string {
 	if env := os.Getenv("MEILI_SEARCH_URL"); env != "" {
-		return env
+		return "http://" + env
 	}
-	return "localhost:7700"
+	return "http://localhost:7700"
 }
 
 func getHttpPort() string {
