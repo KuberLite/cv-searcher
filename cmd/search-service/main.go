@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/KuberLite/cv-searcher/internal/config"
+	"github.com/KuberLite/cv-searcher/internal/handler"
 	"github.com/KuberLite/cv-searcher/internal/meilisearch"
-	"github.com/KuberLite/cv-searcher/internal/model"
 )
 
 func main() {
@@ -32,20 +32,11 @@ func main() {
 
 	client := meilisearch.New(cfg.MeiliSearchURL, "products")
 	go func() {
-		//if err := seedTestData(client); err != nil {
-		//	log.Fatal(err)
-		//}
-
-		product := model.Product{
-			ID:          "1",
-			Name:        "iPhone 15 Pro",
-			Description: "Смартфон от Apple с процессором A17 Pro",
-		}
-
-		err := client.DeleteProduct(context.Background(), product)
-
-		if err != nil {
-			log.Fatalln(fmt.Errorf("delete error: %w", err))
+		searchHandler := handler.NewSearchHandler(client)
+		http.HandleFunc("/api/v1/search", searchHandler.Search)
+		log.Println("Staring HTTP server")
+		if err := http.ListenAndServe(cfg.HttpPort, nil); err != nil {
+			log.Fatalf("HTTP server failed: %v", err)
 		}
 	}()
 
