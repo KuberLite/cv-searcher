@@ -61,18 +61,19 @@ func (c *Client) Search(ctx context.Context, searchString string, limit int64) (
 		return nil, fmt.Errorf("failed to search [search string: %s]: %w", searchString, err)
 	}
 
-	fmt.Println(searchRes.Hits)
 	if len(searchRes.Hits) == 0 {
 		return []model.Product{}, nil
 	}
 
-	hitsBytes, _ := json.Marshal(searchRes.Hits)
+	hitsBytes, err := json.Marshal(searchRes.Hits)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal search hits: %w", err)
+	}
 
 	var products []model.Product
 
 	if jsonErr := json.Unmarshal(hitsBytes, &products); jsonErr != nil {
 		return nil, fmt.Errorf("JSON parse error: %w", jsonErr)
-
 	}
 
 	return products, nil

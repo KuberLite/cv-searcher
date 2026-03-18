@@ -11,38 +11,61 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type Consumer struct {
-	reader *kafka.Reader
+type ProductIndexer interface {
+	IndexProduct(ctx context.Context, product model.Product) error
+	DeleteProduct(ctx context.Context, product model.Product) error
 }
 
-func New(cfg config.Config) *Consumer {
+type Consumer struct {
+	reader  *kafka.Reader
+	indexer ProductIndexer
+}
+
+func New(cfg config.Config, indexer ProductIndexer) *Consumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: cfg.KafkaBrokers,
 		Topic:   cfg.KafkaTopic,
 		GroupID: cfg.KafkaGroup,
 	})
 	return &Consumer{
-		reader: reader,
+		reader:  reader,
+		indexer: indexer,
 	}
 }
 
 func (c *Consumer) Start(ctx context.Context) error {
 	defer c.reader.Close()
+
 	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			msg, err := c.reader.ReadMessage(ctx)
-			if err != nil {
-				continue
+		msg, err := c.reader.ReadMessage(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
 			}
-			data := model.ProductEvent{}
-			if err := json.Unmarshal(msg.Value, &data); err != nil {
-				log.Printf("JSON parse error: %v", err)
-				continue
-			}
-			fmt.Println(string(data.Action) + " " + string(data.Payload.Description))
+			log.Printf("Kafka read error: %v", err)
+			continue
 		}
+
+		var event model.ProductEvent
+		if err := json.Unmarshal(msg.Value, &event); err != nil {
+			log.Printf("Failed to unmarshal product event: %v", err)
+			continue
+		}
+
+		if err := c.processEvent(ctx, event); err != nil {
+			log.Printf("Failed to process event (action=%s, id=%s): %v",
+				event.Action, event.Payload.ID, err)
+		}
+	}
+}
+
+func (c *Consumer) processEvent(ctx context.Context, event model.ProductEvent) error {
+	switch event.Action {
+	case "create", "update":
+		return c.indexer.IndexProduct(ctx, event.Payload)
+	case "delete":
+		return c.indexer.DeleteProduct(ctx, event.Payload)
+	default:
+		return fmt.Errorf("unknown action: %s", event.Action)
 	}
 }

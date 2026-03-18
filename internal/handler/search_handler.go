@@ -8,14 +8,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/KuberLite/cv-searcher/internal/meilisearch"
+	"github.com/KuberLite/cv-searcher/internal/model"
 )
 
-type SearchHandler struct {
-	searchClient *meilisearch.Client
+type Searcher interface {
+	Search(ctx context.Context, query string, limit int64) ([]model.Product, error)
 }
 
-func NewSearchHandler(searchClient *meilisearch.Client) *SearchHandler {
+type SearchHandler struct {
+	searchClient Searcher
+}
+
+func NewSearchHandler(searchClient Searcher) *SearchHandler {
 	return &SearchHandler{searchClient: searchClient}
 }
 
