@@ -78,3 +78,14 @@ func (c *Client) Search(ctx context.Context, searchString string, limit int64) (
 
 	return products, nil
 }
+
+func (c *Client) ConfigureIndex(ctx context.Context) error {
+	searchAttributes := []string{"name", "brand", "description"}
+
+	_, err := c.client.Index(c.indexName).UpdateSearchableAttributesWithContext(ctx, &searchAttributes)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete document: %w", err)
+	}
+	return nil
+}

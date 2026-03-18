@@ -22,6 +22,10 @@ func main() {
 	defer cancel()
 
 	meiliClient := meilisearch.New(cfg.MeiliSearchURL, "products")
+	err := meiliClient.ConfigureIndex(ctx)
+	if err != nil {
+		log.Fatal("Warning: failed to configure index: %w", err)
+	}
 
 	mux := http.NewServeMux()
 	searchHandler := handler.NewSearchHandler(meiliClient)
