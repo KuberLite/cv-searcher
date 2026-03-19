@@ -13,6 +13,8 @@ import (
 	"github.com/KuberLite/cv-searcher/internal/handler"
 	"github.com/KuberLite/cv-searcher/internal/kafka"
 	"github.com/KuberLite/cv-searcher/internal/meilisearch"
+	"github.com/KuberLite/cv-searcher/internal/qdrant"
+	"github.com/KuberLite/cv-searcher/internal/vectorizer"
 )
 
 func main() {
@@ -22,7 +24,16 @@ func main() {
 	defer cancel()
 
 	meiliClient := meilisearch.New(cfg.MeiliSearchURL, "products")
-	err := meiliClient.ConfigureIndex(ctx)
+	vectorizerClient := vectorizer.New(cfg.VectorizerURL)
+	qdrantClient, err := qdrantclient.New(cfg.QDRantURL.URL, cfg.QDRantURL.Port, "products")
+	if err != nil {
+		log.Fatalf("Failed to connect to Qdrant: %v", err)
+	}
+	if err = qdrantClient.InitCollection(ctx, 384); err != nil {
+		log.Fatalf("Failed to initialize QDRant: %v", err)
+	}
+
+	err = meiliClient.ConfigureIndex(ctx)
 	if err != nil {
 		log.Fatal("Warning: failed to configure index: %w", err)
 	}
@@ -46,7 +57,7 @@ func main() {
 		}
 	}()
 
-	consumer := kafka.New(cfg, meiliClient)
+	consumer := kafka.New(cfg, meiliClient, vectorizerClient, qdrantClient)
 	go func() {
 		log.Println("Starting Kafka consumer")
 		if err := consumer.Start(ctx); err != nil {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -13,6 +14,13 @@ type Config struct {
 	KafkaGroup     string
 	MeiliSearchURL string
 	HttpPort       string
+	VectorizerURL  string
+	QDRantURL      *QDRantConfig
+}
+
+type QDRantConfig struct {
+	URL  string
+	Port int
 }
 
 func Load() Config {
@@ -23,7 +31,32 @@ func Load() Config {
 		KafkaGroup:     getKafkaGroup(),
 		MeiliSearchURL: getMeiliSearchURL(),
 		HttpPort:       getHttpPort(),
+		VectorizerURL:  getVectorizerURL(),
+		QDRantURL:      getQDRantURL(),
 	}
+}
+
+func getQDRantURL() *QDRantConfig {
+	fullUrl := strings.Split(os.Getenv("QDR_URL"), `:`)
+	port, _ := strconv.Atoi(fullUrl[1])
+	url := fullUrl[0]
+	if env := os.Getenv("QDR_URL"); env != "" {
+		return &QDRantConfig{
+			URL:  url,
+			Port: port,
+		}
+	}
+	return &QDRantConfig{
+		URL:  "localhost",
+		Port: 6333,
+	}
+}
+
+func getVectorizerURL() string {
+	if env := os.Getenv("VECTORIZER_URL"); env != "" {
+		return "http://" + env
+	}
+	return "http://localhost:8000"
 }
 
 func getKafkaBrokers() []string {
