@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/KuberLite/cv-searcher/internal/model"
 	"github.com/meilisearch/meilisearch-go"
@@ -15,7 +17,8 @@ type Client struct {
 }
 
 func New(host, indexName string) *Client {
-	client := meilisearch.New(host)
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	client := meilisearch.New(host, meilisearch.WithCustomClient(httpClient))
 	return &Client{
 		client:    client,
 		indexName: indexName,
@@ -81,11 +84,8 @@ func (c *Client) Search(ctx context.Context, searchString string, limit int64) (
 
 func (c *Client) ConfigureIndex(ctx context.Context) error {
 	searchAttributes := []string{"name", "brand", "description"}
-
-	_, err := c.client.Index(c.indexName).UpdateSearchableAttributesWithContext(ctx, &searchAttributes)
-
-	if err != nil {
-		return fmt.Errorf("failed to delete document: %w", err)
+	if _, err := c.client.Index(c.indexName).UpdateSearchableAttributesWithContext(ctx, &searchAttributes); err != nil {
+		return fmt.Errorf("update searchable attributes: %w", err)
 	}
 	return nil
 }

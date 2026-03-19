@@ -13,7 +13,7 @@ type Client struct {
 }
 
 type SearchResult struct {
-	ProductID int
+	ProductID string
 	Score     float32
 	Payload   map[string]*qdrant.Value
 }
@@ -73,11 +73,15 @@ func (c *Client) IndexProduct(ctx context.Context, productID string, vector []fl
 }
 
 func (c *Client) Search(ctx context.Context, vector []float32, limit int) ([]SearchResult, error) {
+	scoreThreshold := float32(0.77)
 	resp, err := c.client.GetPointsClient().Search(ctx, &qdrant.SearchPoints{
 		CollectionName: c.collectionName,
 		Vector:         vector,
 		Limit:          uint64(limit),
-		WithPayload:    &qdrant.WithPayloadSelector{},
+		ScoreThreshold: &scoreThreshold,
+		WithPayload: &qdrant.WithPayloadSelector{
+			SelectorOptions: &qdrant.WithPayloadSelector_Enable{Enable: true},
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -86,9 +90,9 @@ func (c *Client) Search(ctx context.Context, vector []float32, limit int) ([]Sea
 	scoredPoints := resp.GetResult()
 	results := make([]SearchResult, 0, len(scoredPoints))
 	for _, sp := range scoredPoints {
-		productID := 0
+		productID := ""
 		if id := sp.GetId(); id != nil {
-			productID = int(id.GetNum())
+			productID = strconv.FormatUint(id.GetNum(), 10)
 		}
 		results = append(results, SearchResult{
 			ProductID: productID,

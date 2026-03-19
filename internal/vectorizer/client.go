@@ -39,7 +39,7 @@ func (c *Client) GetVector(ctx context.Context, text string, vectorType string) 
 		c.cacheMutex.RUnlock()
 		return vec, nil
 	}
-	defer c.cacheMutex.RUnlock()
+	c.cacheMutex.RUnlock()
 
 	reqBody := EmbeddedRequest{Text: text, Type: vectorType}
 	reqJSON, _ := json.Marshal(reqBody)

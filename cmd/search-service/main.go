@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -29,17 +30,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to Qdrant: %v", err)
 	}
-	if err = qdrantClient.InitCollection(ctx, 384); err != nil {
+	if err = qdrantClient.InitCollection(ctx, 1024); err != nil {
 		log.Fatalf("Failed to initialize QDRant: %v", err)
 	}
 
-	err = meiliClient.ConfigureIndex(ctx)
-	if err != nil {
-		log.Fatal("Warning: failed to configure index: %w", err)
+	if err := meiliClient.ConfigureIndex(ctx); err != nil {
+		log.Fatalf("Failed to configure Meilisearch index: %v", err)
 	}
 
 	mux := http.NewServeMux()
-	searchHandler := handler.NewSearchHandler(meiliClient)
+	searchHandler := handler.NewSearchHandler(meiliClient, vectorizerClient, qdrantClient)
 	mux.HandleFunc("/api/v1/search", searchHandler.Search)
 
 	srv := &http.Server{
@@ -52,7 +52,7 @@ func main() {
 
 	go func() {
 		log.Printf("Starting HTTP server on %s", cfg.HttpPort)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
 	}()

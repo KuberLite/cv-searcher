@@ -37,26 +37,26 @@ func Load() Config {
 }
 
 func getQDRantURL() *QDRantConfig {
-	fullUrl := strings.Split(os.Getenv("QDR_URL"), `:`)
-	port, _ := strconv.Atoi(fullUrl[1])
-	url := fullUrl[0]
-	if env := os.Getenv("QDR_URL"); env != "" {
-		return &QDRantConfig{
-			URL:  url,
-			Port: port,
-		}
+	env := os.Getenv("QDR_URL")
+	if env == "" {
+		return &QDRantConfig{URL: "localhost", Port: 6334}
 	}
-	return &QDRantConfig{
-		URL:  "localhost",
-		Port: 6333,
+	parts := strings.SplitN(env, ":", 2)
+	if len(parts) < 2 {
+		return &QDRantConfig{URL: parts[0], Port: 6334}
 	}
+	port, _ := strconv.Atoi(parts[1])
+	if port <= 0 {
+		port = 6334
+	}
+	return &QDRantConfig{URL: parts[0], Port: port}
 }
 
 func getVectorizerURL() string {
 	if env := os.Getenv("VECTORIZER_URL"); env != "" {
 		return "http://" + env
 	}
-	return "http://localhost:8000"
+	return "http://127.0.0.1:8000"
 }
 
 func getKafkaBrokers() []string {

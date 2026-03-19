@@ -78,10 +78,11 @@ func (c *Consumer) processEvent(ctx context.Context, event model.ProductEvent) e
 				event.Payload.Name,
 				event.Payload.Description,
 			)
-			if err != nil {
+			if err == nil {
 				payload := map[string]interface{}{
-					"name":  event.Payload.Name,
-					"brand": event.Payload.Brand,
+					"name":        event.Payload.Name,
+					"description": event.Payload.Description,
+					"brand":       event.Payload.Brand,
 				}
 				_ = c.qdrantClient.IndexProduct(ctx, event.Payload.ID, vector, payload)
 			}
