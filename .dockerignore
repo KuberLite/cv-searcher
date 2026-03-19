@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+*.md
+embedding_service/venv
+embedding_service/__pycache__
+**/__pycache__
+**/*.pyc
+.dockerignore
+Dockerfile
