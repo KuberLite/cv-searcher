@@ -20,6 +20,7 @@ type ProductIndexer interface {
 
 type Consumer struct {
 	reader       *kafka.Reader
+	dlqWriter    *kafka.Writer
 	indexer      ProductIndexer
 	vectorizer   *vectorizer.Client
 	qdrantClient *qdrantclient.Client
@@ -31,8 +32,15 @@ func New(cfg config.Config, indexer ProductIndexer, vectorizer *vectorizer.Clien
 		Topic:   cfg.KafkaTopic,
 		GroupID: cfg.KafkaGroup,
 	})
+
+	dlqWriter := &kafka.Writer{
+		Addr:     kafka.TCP(cfg.KafkaBrokers...),
+		Topic:    cfg.KafkaTopic + "-dlq",
+		Balancer: &kafka.LeastBytes{},
+	}
 	return &Consumer{
 		reader:       reader,
+		dlqWriter:    dlqWriter,
 		indexer:      indexer,
 		vectorizer:   vectorizer,
 		qdrantClient: qdrantClient,
@@ -41,9 +49,10 @@ func New(cfg config.Config, indexer ProductIndexer, vectorizer *vectorizer.Clien
 
 func (c *Consumer) Start(ctx context.Context) error {
 	defer c.reader.Close()
+	defer c.dlqWriter.Close()
 
 	for {
-		msg, err := c.reader.ReadMessage(ctx)
+		msg, err := c.reader.FetchMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -52,17 +61,53 @@ func (c *Consumer) Start(ctx context.Context) error {
 			continue
 		}
 
-		var event model.ProductEvent
-		if err := json.Unmarshal(msg.Value, &event); err != nil {
-			log.Printf("Failed to unmarshal product event: %v", err)
+		event, err := parseAndValidate(msg.Value)
+		if err != nil {
+			log.Printf("Kafka parse error: %v", err)
+			c.sendToDLQ(ctx, msg, err)
+			c.reader.CommitMessages(ctx, msg)
 			continue
 		}
 
 		if err := c.processEvent(ctx, event); err != nil {
 			log.Printf("Failed to process event (action=%s, id=%s): %v",
 				event.Action, event.Payload.ID, err)
+			c.sendToDLQ(ctx, msg, err)
+			c.reader.CommitMessages(ctx, msg)
+		} else {
+			c.reader.CommitMessages(ctx, msg)
 		}
 	}
+}
+
+func (c *Consumer) sendToDLQ(ctx context.Context, msg kafka.Message, reason error) error {
+	return c.dlqWriter.WriteMessages(ctx, kafka.Message{
+		Key:   msg.Key,
+		Value: msg.Value,
+		Headers: []kafka.Header{
+			{Key: "dlq-reason", Value: []byte(reason.Error())},
+			{Key: "dlq-original-topic", Value: []byte(msg.Topic)},
+		},
+	})
+}
+
+func parseAndValidate(value []byte) (model.ProductEvent, error) {
+	var pe model.ProductEvent
+	if err := json.Unmarshal(value, &pe); err != nil {
+		return pe, fmt.Errorf("invalid json: %w", err)
+	}
+
+	if pe.ProjectID == "" {
+		return pe, fmt.Errorf("missing project_id")
+	}
+	if pe.Action == "" {
+		return pe, fmt.Errorf("missing action")
+	}
+	if pe.Payload.ID == "" {
+		return pe, fmt.Errorf("missing payload.id")
+	}
+
+	return pe, nil
 }
 
 func (c *Consumer) processEvent(ctx context.Context, event model.ProductEvent) error {

@@ -8,6 +8,7 @@ type Product struct {
 }
 
 type ProductEvent struct {
-	Action  string  `json:"action"`
-	Payload Product `json:"payload"`
+	ProjectID string  `json:"project_id"`
+	Action    string  `json:"action"`
+	Payload   Product `json:"payload"`
 }
