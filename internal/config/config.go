@@ -16,6 +16,7 @@ type Config struct {
 	HttpPort       string
 	VectorizerURL  string
 	QDRantURL      *QDRantConfig
+	PostgresDSN    string
 }
 
 type QDRantConfig struct {
@@ -33,7 +34,15 @@ func Load() Config {
 		HttpPort:       getHttpPort(),
 		VectorizerURL:  getVectorizerURL(),
 		QDRantURL:      getQDRantURL(),
+		PostgresDSN:    getPostgresDSN(),
 	}
+}
+
+func getPostgresDSN() string {
+	if env := os.Getenv("POSTGRES_DSN"); env != "" {
+		return env
+	}
+	return "postgres://searcher:searcher@localhost:5432/searcher_db"
 }
 
 func getQDRantURL() *QDRantConfig {
