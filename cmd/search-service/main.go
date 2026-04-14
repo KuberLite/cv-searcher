@@ -15,7 +15,9 @@ import (
 	"github.com/KuberLite/cv-searcher/internal/kafka"
 	"github.com/KuberLite/cv-searcher/internal/meilisearch"
 	"github.com/KuberLite/cv-searcher/internal/qdrant"
+	"github.com/KuberLite/cv-searcher/internal/repo"
 	"github.com/KuberLite/cv-searcher/internal/vectorizer"
+	"github.com/pressly/goose/v3"
 )
 
 func main() {
@@ -23,6 +25,16 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	database, err := repo.New(ctx, cfg.PostgresDSN)
+	if err != nil {
+		log.Fatalf("Failed to connect to postgres: %v", err)
+	}
+	goose.SetDialect("postgres")
+	if err := goose.Up(database.DB(), "migrations"); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	defer database.Close()
 
 	meiliClient := meilisearch.New(cfg.MeiliSearchURL, "products")
 	vectorizerClient := vectorizer.New(cfg.VectorizerURL)
